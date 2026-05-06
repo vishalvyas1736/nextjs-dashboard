@@ -12,6 +12,7 @@ import { fetchRevenue } from '@/app/lib/data';
 
 export default async function RevenueChart() {
   const revenue = await fetchRevenue();
+  console.log(revenue);
   const chartHeight = 350;
   // NOTE: Uncomment this code in Chapter 7
 
@@ -22,7 +23,10 @@ export default async function RevenueChart() {
   }
 
   return (
+   
+    
     <div className="w-full md:col-span-4">
+
       <h2 className={`${lusitana.className} mb-4 text-xl md:text-2xl`}>
         Recent Revenue
       </h2>
@@ -59,5 +63,6 @@ export default async function RevenueChart() {
         </div>
       </div> 
     </div>
+   
   );
 }

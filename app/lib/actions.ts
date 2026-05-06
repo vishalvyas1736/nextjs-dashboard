@@ -4,8 +4,8 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import postgres from 'postgres';
 import id from 'zod/v4/locales/id.js';
-import { signIn } from '@/auth';
 import { AuthError } from 'next-auth';
+import { time } from 'console';
 const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
 const FormSchema = z.object({
   id: z.string(),
@@ -19,12 +19,14 @@ const FormSchema = z.object({
     invalid_type_error: 'Please select an invoice status.',
   }),
   date: z.string(),
+  time: z.string(),
 });
 export type State = {
   errors?: {
     customerId?: string[];
     amount?: string[];
     status?: string[];
+    time?: string[];
   };
   message?: string | null;
 };
@@ -35,6 +37,7 @@ export async function createInvoice(prevState: State, formData: FormData) {
     customerId: formData.get('customerId'),
     amount: formData.get('amount'),
     status: formData.get('status'),
+    time: formData.get('time'),
   });
   // If form validation fails, return errors early. Otherwise, continue.
   if (!validatedFields.success) {
@@ -46,10 +49,11 @@ export async function createInvoice(prevState: State, formData: FormData) {
   const { customerId, amount, status } = validatedFields.data;
   const amountInCents = amount * 100;
   const date = new Date().toISOString().split('T')[0];
+  const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     try{
     await sql`
-        INSERT INTO invoices (customer_id, amount, status, date)
-        VALUES (${customerId}, ${amountInCents}, ${status}, ${date})
+        INSERT INTO invoices (customer_id, amount, status, date, time)
+        VALUES (${customerId}, ${amountInCents}, ${status}, ${date}, ${time})
     `;
     }
     catch(error){
@@ -72,6 +76,7 @@ export async function updateInvoice(
     customerId: formData.get('customerId'),
     amount: formData.get('amount'),
     status: formData.get('status'),
+    time: formData.get('time'),
   });
  
   if (!validatedFields.success) {
@@ -83,11 +88,12 @@ export async function updateInvoice(
  
   const { customerId, amount, status } = validatedFields.data;
   const amountInCents = amount * 100;
+  const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
  
   try {
     await sql`
       UPDATE invoices
-      SET customer_id = ${customerId}, amount = ${amountInCents}, status = ${status}
+      SET customer_id = ${customerId}, amount = ${amountInCents}, status = ${status}, time = ${time}
       WHERE id = ${id}
     `;
   } catch (error) {
@@ -99,26 +105,15 @@ export async function updateInvoice(
 }
 
 export async function deleteInvoice(id: string) {
-    throw new Error('Failed to Delete Invoice');
-  await sql`DELETE FROM invoices WHERE id = ${id}`;
-  revalidatePath('/dashboard/invoices');
-}
-
-export async function authenticate(
-  prevState: string | undefined,
-  formData: FormData,
-) {
   try {
-    await signIn('credentials', formData);
+    await sql`DELETE FROM invoices WHERE id = ${id}`;
+    revalidatePath('/dashboard/invoices');
+    return { message: 'Deleted Invoice.' };
   } catch (error) {
-    if (error instanceof AuthError) {
-      switch (error.type) {
-        case 'CredentialsSignin':
-          return 'Invalid credentials.';
-        default:
-          return 'Something went wrong.';
-      }
-    }
-    throw error;
+    // This allows you to log the real error on the server
+    console.error(error); 
+    
+    // This triggers the error.tsx UI for the user
+    throw new Error('Failed to Delete Invoice');
   }
 }
